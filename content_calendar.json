@@ -1,0 +1,45 @@
+{
+  "posts": [
+    {
+      "id": 1,
+      "date": "2026-05-28",
+      "time_slot": "morning",
+      "title": "Top 10 Strongest Anime Characters",
+      "topic": "ranking_power",
+      "category": "Anime Rankings",
+      "keywords": ["strongest anime characters", "powerful anime", "anime power levels", "top 10", "anime ranking"],
+      "status": "draft",
+      "author": "Binny"
+    },
+    {
+      "id": 2,
+      "date": "2026-05-28",
+      "time_slot": "afternoon",
+      "title": "Goku vs Superman",
+      "topic": "character_comparison",
+      "category": "Character Comparisons",
+      "keywords": ["Goku vs Superman", "anime vs western", "power comparison", "battle", "who would win"],
+      "status": "draft",
+      "author": "Binny"
+    },
+    {
+      "id": 3,
+      "date": "2026-05-28",
+      "time_slot": "evening",
+      "title": "Why Anime Endings Disappoint Fans",
+      "topic": "theory",
+      "category": "Theories",
+      "keywords": ["anime endings", "disappointing", "fan theory", "anime conclusion", "story analysis"],
+      "status": "draft",
+      "author": "Binny"
+    }
+  ],
+  "categories": [
+    "Anime News",
+    "Character Comparisons",
+    "Anime Rankings",
+    "Power System Analysis",
+    "Theories & Discussions",
+    "Anime Recommendations"
+  ]
+}
