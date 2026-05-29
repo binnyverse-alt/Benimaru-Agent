@@ -1,357 +1,236 @@
 #!/usr/bin/env python3
 
 """
-Benimaru Telegram Bot
+Benimaru Telegram Bot - Simple Version
 Control your anime blog automation from Telegram
 """
 
 import os
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler, 
+    CallbackQueryHandler, ContextTypes, filters
+)
 
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('telegram_bot.log'),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger('BenimaruBot')
 
 load_dotenv()
 
-# Bot configuration
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
-REPO_OWNER = "binnyverse-alt"
-REPO_NAME = "Benimaru-Agent"
 
-# Available topics
-TOPICS = {
-    'ranking_power': '🏆 Ranking/Power Levels',
-    'character_comparison': '⚔️ Character Comparison',
-    'theory': '🧠 Theory/Analysis',
-    'news': '📰 News'
-}
-
-TIME_SLOTS = {
-    'morning': '☀️ Morning (8:00 AM)',
-    'afternoon': '🌤️ Afternoon (2:00 PM)',
-    'evening': '🌙 Evening (8:00 PM)'
-}
-
-class BenimaruTelegramBot:
-    """Telegram bot for managing Benimaru content"""
-    
+class BenimaruBot:
     def __init__(self):
         self.calendar_file = 'content_calendar.json'
-        self.calendar_data = self.load_calendar()
+        logger.info("✅ Benimaru Bot initialized")
     
     def load_calendar(self):
-        """Load content calendar from file"""
         try:
             with open(self.calendar_file, 'r') as f:
                 return json.load(f)
-        except FileNotFoundError:
+        except:
             return {'posts': [], 'categories': []}
     
-    def save_calendar(self):
-        """Save content calendar to file"""
+    def save_calendar(self, data):
         with open(self.calendar_file, 'w') as f:
-            json.dump(self.calendar_data, f, indent=2)
+            json.dump(data, f, indent=2)
     
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Start command"""
-        welcome_text = """
-🎌 **Welcome to Benimaru Telegram Bot!**
+        msg = """🎌 **Benimaru Anime Bot Ready!**
 
-I help you manage your anime blog automation directly from Telegram.
+I help manage your anime blog automation.
 
-**Available Commands:**
-/add - Add new blog post
-/view - View scheduled posts
+**📋 Commands:**
+/add - Add new post
+/view - View all posts
 /today - Today's posts
-/tomorrow - Tomorrow's posts
-/categories - View categories
-/help - Show help menu
-
-**Topics:**
-🏆 ranking_power - Top 10, Rankings
-⚔️ character_comparison - VS battles, Comparisons
-🧠 theory - Theories, Analysis
-📰 news - Breaking news, Announcements
-
-Start by typing /add to create your first post!
-        """
-        await update.message.reply_text(welcome_text, parse_mode='Markdown')
+/help - Show help
+"""
+        await update.message.reply_text(msg, parse_mode='Markdown')
     
-    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def help_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Help command"""
-        help_text = """
-📚 **Benimaru Bot Help**
+        msg = """📚 **Help Menu**
 
-**🎯 Main Commands:**
-/add - Create a new post
-/view - List all scheduled posts
-/today - Show today's posts
-/tomorrow - Show tomorrow's posts
-/edit - Edit an existing post
-/delete - Delete a post
-/categories - Show all categories
-
-**📅 Date Format:** DD/MM/YYYY (e.g., 29/05/2026)
-
-**⏰ Time Slots:**
-morning - 8:00 AM UTC
-afternoon - 2:00 PM UTC
-evening - 8:00 PM UTC
-
-**📝 Topics:**
-ranking_power - Ranking/Power Levels
-character_comparison - Character Comparison
-theory - Theory/Analysis
-news - News
-
-**Example:**
-Date: 30/05/2026
-Time: morning
-Title: Top 10 Best Anime
-Topic: ranking_power
-        """
-        await update.message.reply_text(help_text, parse_mode='Markdown')
+/start - Welcome
+/add - Create post
+/view - See posts
+/today - Today posts
+/tomorrow - Tomorrow posts
+/help - This menu
+"""
+        await update.message.reply_text(msg, parse_mode='Markdown')
     
-    async def add_post(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Start adding a new post"""
-        context.user_data['add_step'] = 'date'
-        keyboard = []
-        await update.message.reply_text(
-            "📅 **Enter the date** (DD/MM/YYYY)\nExample: 29/05/2026",
-            parse_mode='Markdown'
-        )
+    async def add(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Add post command"""
+        context.user_data['step'] = 'date'
+        await update.message.reply_text("📅 Enter date (DD/MM/YYYY):\nExample: 31/05/2026")
     
-    async def view_posts(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """View all scheduled posts"""
-        posts = self.calendar_data.get('posts', [])
+    async def view(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """View all posts"""
+        data = self.load_calendar()
+        posts = data.get('posts', [])
         
         if not posts:
-            await update.message.reply_text("❌ No posts scheduled yet!")
+            await update.message.reply_text("❌ No posts")
             return
         
-        # Group by date
-        posts_by_date = {}
+        msg = "📋 **All Posts:**\n\n"
         for post in posts:
-            date = post['date']
-            if date not in posts_by_date:
-                posts_by_date[date] = []
-            posts_by_date[date].append(post)
+            msg += f"📅 {post['date']} {post['time_slot']}\n"
+            msg += f"📝 {post['title']}\n"
+            msg += f"🎯 {post['topic']}\n\n"
         
-        message = "📋 **All Scheduled Posts:**\n\n"
-        for date in sorted(posts_by_date.keys()):
-            message += f"📅 **{date}**\n"
-            for post in posts_by_date[date]:
-                emoji = {
-                    'morning': '☀️',
-                    'afternoon': '🌤️',
-                    'evening': '🌙'
-                }.get(post['time_slot'], '⏰')
-                message += f"{emoji} {post['time_slot']}: {post['title']}\n"
-                message += f"   Topic: {post['topic']}\n\n"
-        
-        await update.message.reply_text(message, parse_mode='Markdown')
+        await update.message.reply_text(msg, parse_mode='Markdown')
     
-    async def today_posts(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Show today's posts"""
+    async def today(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Today's posts"""
         today = datetime.now().strftime('%Y-%m-%d')
-        posts = [p for p in self.calendar_data.get('posts', []) if p['date'] == today]
+        data = self.load_calendar()
+        posts = [p for p in data.get('posts', []) if p['date'] == today]
         
         if not posts:
-            await update.message.reply_text(f"❌ No posts for today ({today})")
+            await update.message.reply_text(f"❌ No posts today ({today})")
             return
         
-        message = f"📅 **Today's Posts ({today})**\n\n"
+        msg = f"📅 **Today ({today}):**\n\n"
         for post in posts:
-            emoji = {
-                'morning': '☀️',
-                'afternoon': '🌤️',
-                'evening': '🌙'
-            }.get(post['time_slot'], '⏰')
-            message += f"{emoji} **{post['time_slot'].upper()}**\n"
-            message += f"Title: {post['title']}\n"
-            message += f"Topic: {post['topic']}\n"
-            message += f"Keywords: {', '.join(post['keywords'])}\n\n"
+            msg += f"{post['time_slot']}: {post['title']}\n"
         
-        await update.message.reply_text(message, parse_mode='Markdown')
+        await update.message.reply_text(msg, parse_mode='Markdown')
     
-    async def tomorrow_posts(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Show tomorrow's posts"""
-        tomorrow = datetime.now().strftime('%Y-%m-%d')
-        # Calculate next day
-        from datetime import timedelta
-        next_day = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
-        
-        posts = [p for p in self.calendar_data.get('posts', []) if p['date'] == next_day]
+    async def tomorrow(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Tomorrow's posts"""
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+        data = self.load_calendar()
+        posts = [p for p in data.get('posts', []) if p['date'] == tomorrow]
         
         if not posts:
-            await update.message.reply_text(f"❌ No posts for tomorrow ({next_day})")
+            await update.message.reply_text(f"❌ No posts tomorrow ({tomorrow})")
             return
         
-        message = f"📅 **Tomorrow's Posts ({next_day})**\n\n"
+        msg = f"📅 **Tomorrow ({tomorrow}):**\n\n"
         for post in posts:
-            emoji = {
-                'morning': '☀️',
-                'afternoon': '🌤️',
-                'evening': '🌙'
-            }.get(post['time_slot'], '⏰')
-            message += f"{emoji} **{post['time_slot'].upper()}**\n"
-            message += f"Title: {post['title']}\n"
-            message += f"Topic: {post['topic']}\n"
-            message += f"Keywords: {', '.join(post['keywords'])}\n\n"
+            msg += f"{post['time_slot']}: {post['title']}\n"
         
-        await update.message.reply_text(message, parse_mode='Markdown')
+        await update.message.reply_text(msg, parse_mode='Markdown')
     
-    async def show_categories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Show available categories"""
-        categories = self.calendar_data.get('categories', [])
-        
-        message = "📚 **Available Categories:**\n\n"
-        for i, cat in enumerate(categories, 1):
-            message += f"{i}. {cat}\n"
-        
-        await update.message.reply_text(message, parse_mode='Markdown')
-    
-    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle user messages during post creation"""
-        if 'add_step' not in context.user_data:
+    async def message_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle messages"""
+        if 'step' not in context.user_data:
             return
         
-        step = context.user_data['add_step']
-        message_text = update.message.text
+        step = context.user_data['step']
+        text = update.message.text
         
         if step == 'date':
-            context.user_data['post_date'] = message_text
-            context.user_data['add_step'] = 'time'
+            context.user_data['date'] = text
+            context.user_data['step'] = 'time'
             
-            # Show time slot buttons
             keyboard = [
                 [InlineKeyboardButton("☀️ Morning", callback_data='time_morning')],
                 [InlineKeyboardButton("🌤️ Afternoon", callback_data='time_afternoon')],
                 [InlineKeyboardButton("🌙 Evening", callback_data='time_evening')]
             ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
-                "⏰ **Select time slot:**",
-                reply_markup=reply_markup,
-                parse_mode='Markdown'
+                "⏰ Select time:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
             )
         
-        elif step == 'time':
-            context.user_data['add_step'] = 'title'
-            await update.message.reply_text("📝 **Enter post title:**")
-        
         elif step == 'title':
-            context.user_data['post_title'] = message_text
-            context.user_data['add_step'] = 'topic'
+            context.user_data['title'] = text
+            context.user_data['step'] = 'topic'
             
-            # Show topic buttons
             keyboard = [
-                [InlineKeyboardButton("🏆 Ranking/Power", callback_data='topic_ranking_power')],
+                [InlineKeyboardButton("🏆 Ranking", callback_data='topic_ranking_power')],
                 [InlineKeyboardButton("⚔️ Comparison", callback_data='topic_character_comparison')],
                 [InlineKeyboardButton("🧠 Theory", callback_data='topic_theory')],
                 [InlineKeyboardButton("📰 News", callback_data='topic_news')]
             ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
-                "🎯 **Select topic:**",
-                reply_markup=reply_markup,
-                parse_mode='Markdown'
+                "🎯 Select topic:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
             )
         
         elif step == 'keywords':
-            keywords = [k.strip() for k in message_text.split(',')]
-            context.user_data['post_keywords'] = keywords
+            keywords = [k.strip() for k in text.split(',')]
             
-            # Create the post
+            # Create post
+            data = self.load_calendar()
             post = {
-                'id': len(self.calendar_data['posts']) + 1,
-                'date': context.user_data['post_date'],
-                'time_slot': context.user_data['post_time'],
-                'title': context.user_data['post_title'],
-                'topic': context.user_data['post_topic'],
-                'category': context.user_data.get('post_category', 'Anime'),
+                'id': len(data['posts']) + 1,
+                'date': context.user_data['date'],
+                'time_slot': context.user_data['time'],
+                'title': context.user_data['title'],
+                'topic': context.user_data['topic'],
+                'category': 'Anime',
                 'keywords': keywords,
                 'status': 'draft',
                 'author': 'Binny'
             }
             
-            self.calendar_data['posts'].append(post)
-            self.save_calendar()
-            
-            # Clear context
+            data['posts'].append(post)
+            self.save_calendar(data)
             context.user_data.clear()
             
-            message = f"""
-✅ **Post Added Successfully!**
-
-📅 Date: {post['date']}
-⏰ Time: {post['time_slot']}
-📝 Title: {post['title']}
-🎯 Topic: {post['topic']}
-🏷️ Keywords: {', '.join(keywords)}
-            """
-            await update.message.reply_text(message, parse_mode='Markdown')
+            await update.message.reply_text(
+                f"✅ **Post Added!**\n📝 {post['title']}\n🎯 {post['topic']}"
+            )
     
-    async def button_click(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle button clicks"""
         query = update.callback_query
-        data = query.data
-        
         await query.answer()
         
-        if data.startswith('time_'):
-            time_slot = data.replace('time_', '')
-            context.user_data['post_time'] = time_slot
-            context.user_data['add_step'] = 'title'
-            await query.edit_message_text("📝 **Enter post title:**")
+        if query.data.startswith('time_'):
+            time = query.data.replace('time_', '')
+            context.user_data['time'] = time
+            context.user_data['step'] = 'title'
+            await query.edit_message_text("📝 Enter post title:")
         
-        elif data.startswith('topic_'):
-            topic = data.replace('topic_', '')
-            context.user_data['post_topic'] = topic
-            context.user_data['add_step'] = 'keywords'
-            await query.edit_message_text(
-                "🏷️ **Enter keywords (separated by comma):**\nExample: anime, power, ranking"
-            )
+        elif query.data.startswith('topic_'):
+            topic = query.data.replace('topic_', '')
+            context.user_data['topic'] = topic
+            context.user_data['step'] = 'keywords'
+            await query.edit_message_text("🏷️ Enter keywords (comma separated):")
 
 async def main():
-    """Start the bot"""
     if not TELEGRAM_BOT_TOKEN:
-        logger.error("❌ TELEGRAM_BOT_TOKEN not set in .env")
+        logger.error("❌ TELEGRAM_BOT_TOKEN not found!")
         return
     
-    logger.info("🤖 Starting Benimaru Telegram Bot...")
+    logger.info("🚀 Starting Benimaru Bot...")
     
-    bot = BenimaruTelegramBot()
+    bot = BenimaruBot()
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     
-    # Create application
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", bot.start))
+    app.add_handler(CommandHandler("help", bot.help_cmd))
+    app.add_handler(CommandHandler("add", bot.add))
+    app.add_handler(CommandHandler("view", bot.view))
+    app.add_handler(CommandHandler("today", bot.today))
+    app.add_handler(CommandHandler("tomorrow", bot.tomorrow))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.message_handler))
+    app.add_handler(CallbackQueryHandler(bot.button_handler))
     
-    # Add handlers
-    application.add_handler(CommandHandler("start", bot.start))
-    application.add_handler(CommandHandler("help", bot.help_command))
-    application.add_handler(CommandHandler("add", bot.add_post))
-    application.add_handler(CommandHandler("view", bot.view_posts))
-    application.add_handler(CommandHandler("today", bot.today_posts))
-    application.add_handler(CommandHandler("tomorrow", bot.tomorrow_posts))
-    application.add_handler(CommandHandler("categories", bot.show_categories))
+    logger.info("✅ Bot handlers registered")
+    logger.info("🎌 Benimaru Bot is running...")
     
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.handle_message))
-    application.add_handler(CallbackQueryHandler(bot.button_click))
-    
-    logger.info("✅ Bot started successfully!")
-    
-    # Start polling
-    await application.run_polling()
+    await app.run_polling()
 
 if __name__ == '__main__':
     import asyncio
